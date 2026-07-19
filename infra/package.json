@@ -5,8 +5,9 @@
   "bin": { "kindred": "bin/kindred.js" },
   "scripts": {
     "synth": "cdk synth",
-    "deploy": "cdk deploy",
-    "bootstrap": "cdk bootstrap"
+    "deploy": "cdk deploy --profile AWS",
+    "destroy": "cdk destroy --profile AWS",
+    "bootstrap": "cdk bootstrap --profile AWS"
   },
   "dependencies": {
     "aws-cdk-lib": "^2.160.0",
