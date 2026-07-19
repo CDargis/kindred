@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seeds Explorer</title>
+<style>
+  :root {
+    --bg: #12140f; --panel: #1a1e15; --border: #2d3324; --text: #e4e8da;
+    --muted: #9aa389; --accent: #8fbc5a; --accent-dim: #3d4a2c; --chip: #242a1b;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, sans-serif; }
+  .layout { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+  aside { background: var(--panel); border-right: 1px solid var(--border); padding: 16px; overflow-y: auto; height: 100vh; position: sticky; top: 0; }
+  main { padding: 20px 24px; }
+  h1 { font-size: 17px; margin-bottom: 14px; color: var(--accent); }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 16px 0 6px; }
+  input[type=text], input[type=number], select {
+    width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 9px; font-size: 13px;
+  }
+  input:focus, select:focus { outline: 1px solid var(--accent-dim); }
+  .row { display: flex; gap: 6px; }
+  .facet { max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; background: var(--bg); }
+  .facet label { display: flex; align-items: center; gap: 6px; padding: 2px 0; cursor: pointer; color: var(--text); }
+  .facet .n { color: var(--muted); font-size: 11px; margin-left: auto; }
+  .facet input { accent-color: var(--accent); }
+  button { background: var(--accent); color: #16200a; border: 0; border-radius: 6px; padding: 8px 14px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 14px; }
+  button.secondary { background: var(--chip); color: var(--muted); margin-top: 6px; }
+  .summary { color: var(--muted); margin-bottom: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+  .card .top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .card a { color: var(--accent); text-decoration: none; font-weight: 600; font-size: 15px; }
+  .card a:hover { text-decoration: underline; }
+  .src { font-size: 11px; padding: 1px 7px; border-radius: 10px; background: var(--chip); color: var(--muted); }
+  .stats { color: var(--muted); font-size: 12px; margin: 4px 0; }
+  .stats b { color: var(--text); font-weight: 600; }
+  .lineage { font-size: 12.5px; color: var(--text); margin: 4px 0; }
+  .lineage span { color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .chip { font-size: 11px; padding: 1px 8px; border-radius: 10px; background: var(--chip); }
+  .chip.med { outline: 1px solid var(--accent-dim); }
+  .pager { display: flex; gap: 8px; align-items: center; margin: 14px 0; }
+  .pager button { width: auto; margin: 0; padding: 6px 12px; }
+  .error { color: #e08080; }
+  .lineage a.ancestry-link { color: var(--accent); font-size: 11px; margin-left: 8px; text-decoration: none; }
+  .lineage a.ancestry-link:hover { text-decoration: underline; }
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 10; }
+  .modal-bg.open { display: flex; }
+  .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; max-width: 560px; width: 90%; max-height: 82vh; overflow-y: auto; }
+  .modal h3 { color: var(--accent); margin-bottom: 4px; }
+  .modal .sub { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+  .anc { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border); }
+  .anc .nm { font-size: 13px; }
+  .anc .gen { color: var(--muted); font-size: 11px; }
+  .bar { height: 6px; background: var(--accent-dim); border-radius: 3px; grid-column: 1 / -1; }
+  .bar > i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+  .anc .pct { color: var(--text); font-variant-numeric: tabular-nums; font-size: 12px; }
+  .modal .close { margin-top: 14px; }
+  .ancestry-box { background: var(--bg); border: 1px solid var(--accent-dim); border-radius: 8px; padding: 10px; }
+  .ac-wrap { position: relative; }
+  .ac-menu { position: absolute; left: 0; right: 0; top: 100%; z-index: 5; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; margin-top: 2px; max-height: 240px; overflow-y: auto; display: none; }
+  .ac-menu.open { display: block; }
+  .ac-item { padding: 6px 9px; cursor: pointer; font-size: 13px; display: flex; justify-content: space-between; gap: 8px; }
+  .ac-item:hover, .ac-item.active { background: var(--accent-dim); }
+  .ac-item .cnt { color: var(--muted); font-size: 11px; }
+  #ancChips { margin-top: 8px; }
+  #ancChips .chip { background: var(--accent-dim); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+  #ancChips .chip::after { content: "✕"; color: var(--muted); font-size: 10px; }
+  .minrow { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .minrow input[type=range] { flex: 1; accent-color: var(--accent); }
+  .algdesc { color: var(--muted); font-size: 11px; margin-top: 6px; line-height: 1.35; }
+  .score-badge { background: var(--accent); color: #16200a; font-weight: 700; font-size: 12px; padding: 1px 8px; border-radius: 10px; font-variant-numeric: tabular-nums; }
+  .modal .algtabs { display: flex; gap: 6px; margin: 6px 0 12px; }
+  .modal .algtabs button { width: auto; margin: 0; padding: 4px 10px; font-size: 12px; background: var(--chip); color: var(--muted); font-weight: 500; }
+  .modal .algtabs button.on { background: var(--accent); color: #16200a; font-weight: 700; }
+  @media (max-width: 760px) { .layout { grid-template-columns: 1fr; } aside { height: auto; position: static; } }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <h1>🌱 Seeds Explorer</h1>
+    <h2>Ancestry search</h2>
+    <div class="ancestry-box">
+      <div class="ac-wrap">
+        <input type="text" id="ancInput" placeholder="add ancestor (e.g. Chemdog)…" autocomplete="off">
+        <div class="ac-menu" id="acMenu"></div>
+      </div>
+      <div class="chips" id="ancChips"></div>
+      <div class="row" style="margin-top:6px">
+        <select id="alg" title="ranking algorithm">
+          <option value="convergence">convergence (line/inbreeding)</option>
+          <option value="contribution">contribution (genetic share)</option>
+          <option value="occurrences">occurrences (raw recurrence)</option>
+        </select>
+      </div>
+      <label class="minrow"><span>min <b id="minLabel">0.01</b></span>
+        <input type="range" id="minThresh" min="0" max="0.5" step="0.005" value="0.01"></label>
+      <button class="secondary" id="globalRank" style="margin-top:8px">Rank ALL strains by this ▸</button>
+      <div class="algdesc" id="algDesc"></div>
+    </div>
+    <h2>Text search</h2>
+    <input type="text" id="q" placeholder="name or description…">
+    <h2>Lineage contains (raw text)</h2>
+    <input type="text" id="lineage" placeholder="e.g. Permanent Marker">
+    <h2>THC %</h2>
+    <div class="row">
+      <input type="number" id="thc_min" placeholder="min">
+      <input type="number" id="thc_max" placeholder="max">
+    </div>
+    <h2>Source / type</h2>
+    <select id="source">
+      <option value="">any source</option>
+      <option value="blimburn">Blimburn</option>
+      <option value="seedsman">Seedsman</option>
+    </select>
+    <div style="height:6px"></div>
+    <select id="flowering">
+      <option value="">any flowering</option>
+      <option value="photoperiod">photoperiod</option>
+      <option value="autoflower">autoflower</option>
+    </select>
+    <h2>Effects</h2><div class="facet" id="f-effects"></div>
+    <h2>Medical</h2><div class="facet" id="f-medical"></div>
+    <h2>Flavors</h2><div class="facet" id="f-flavors"></div>
+    <h2>Terpenes</h2><div class="facet" id="f-terpenes"></div>
+    <h2>Sort</h2>
+    <select id="sort">
+      <option value="name">name</option>
+      <option value="thc">THC high → low</option>
+      <option value="yield">indoor yield high → low</option>
+    </select>
+    <button id="go">Search</button>
+    <button class="secondary" id="clear">Clear filters</button>
+  </aside>
+  <main>
+    <div class="summary" id="summary">Loading…</div>
+    <div id="results"></div>
+    <div class="pager" id="pager"></div>
+  </main>
+</div>
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="mTitle"></h3>
+    <div class="algtabs">
+      <button data-alg="contribution" class="on">Contribution</button>
+      <button data-alg="convergence">Convergence</button>
+      <button data-alg="occurrences">Occurrences</button>
+    </div>
+    <div class="sub" id="mSub"></div>
+    <div id="mBody"></div>
+    <button class="close" id="mClose">Close</button>
+  </div>
+</div>
+<script>
+const $ = (s) => document.querySelector(s);
+let page = 1;
+
+async function loadFacets() {
+  const { facets, meta } = await (await fetch('/api/facets')).json();
+  for (const key of ['effects', 'medical', 'flavors', 'terpenes']) {
+    const el = $('#f-' + key);
+    el.innerHTML = (facets[key] ?? []).map(({ value, n }) =>
+      `<label><input type="checkbox" data-facet="${key}" value="${value}">${value}<span class="n">${n}</span></label>`
+    ).join('') || '<span class="n">none</span>';
+  }
+  $('#summary').textContent = `${meta.total.toLocaleString()} products loaded — set filters and hit Search`;
+}
+
+// selected ancestor strains for ancestry mode: [{id, name}]
+let ancestors = [];
+let globalMode = false; // rank ALL strains by algorithm (no ancestor picked)
+
+const ALG_DESC = {
+  convergence: 'Wright cross-side product — an ancestor reaching the strain from both parent sides (line/back-crossing). Your theory.',
+  contribution: 'Generation-weighted genetic share. A direct parent = 50%.',
+  occurrences: 'Raw count of distinct lineage paths to the ancestor (depth-blind).',
+};
+const ALG_UNIT = { convergence: '', contribution: '%', occurrences: '×' };
+const fmtScore = (alg, v) => alg === 'contribution' ? (v * 100).toFixed(1) + '%'
+  : alg === 'occurrences' ? '×' + v : v.toFixed(4);
+
+// shared filter params (facets + text + THC), used by both search modes
+function baseParams() {
+  const p = new URLSearchParams();
+  for (const id of ['q', 'lineage', 'thc_min', 'thc_max', 'source', 'flowering']) {
+    const v = $('#' + id).value.trim();
+    if (v) p.set(id, v);
+  }
+  for (const key of ['effects', 'medical', 'flavors', 'terpenes']) {
+    const vals = [...document.querySelectorAll(`input[data-facet=${key}]:checked`)].map((c) => c.value);
+    if (vals.length) p.set(key, vals.join(','));
+  }
+  return p;
+}
+
+const fmtRange = (lo, hi, unit = '') =>
+  lo == null && hi == null ? null
+  : lo != null && hi != null && +lo !== +hi ? `${+lo}–${+hi}${unit}`
+  : `${+(lo ?? hi)}${unit}`;
+
+function card(r, scoreHtml = '') {
+  const thc = fmtRange(r.thc_min_pct, r.thc_max_pct, '%');
+  const flw = fmtRange(r.flowering_weeks_min, r.flowering_weeks_max, ' wks');
+  const yld = fmtRange(r.yield_indoor_gm2_min, r.yield_indoor_gm2_max, ' g/m²');
+  const pheno = r.indica_pct != null ? `${+r.indica_pct}% indica / ${+r.sativa_pct}% sativa` : r.varietal;
+  const stats = [
+    thc && `THC <b>${thc}</b>`, pheno && `<b>${pheno}</b>`, flw && `flowering <b>${flw}</b>`,
+    yld && `yield <b>${yld}</b>`, r.sex !== 'unknown' && r.sex, r.flowering_type !== 'unknown' && r.flowering_type,
+    r.breeder && r.breeder !== 'Blimburn' && `by <b>${r.breeder}</b>`,
+  ].filter(Boolean).join(' · ');
+  const chips = [
+    ...r.effects.map((e) => `<span class="chip">${e}</span>`),
+    ...r.medical.map((m) => `<span class="chip med">🩺 ${m}</span>`),
+    ...r.flavors.map((f) => `<span class="chip">👅 ${f}</span>`),
+    ...r.terpenes.map((t) => `<span class="chip">⚗️ ${t}</span>`),
+  ].join('');
+  return `<div class="card">
+    <div class="top"><a href="${r.url}" target="_blank" rel="noopener">${r.name}</a>
+    <span class="src">${r.source}</span>${scoreHtml}</div>
+    ${stats ? `<div class="stats">${stats}</div>` : ''}
+    ${r.lineage_text ? `<div class="lineage"><span>lineage:</span> ${r.lineage_text}
+      ${r.strain_id ? `<a href="#" class="ancestry-link" data-sid="${r.strain_id}" data-name="${r.name.replace(/"/g, '&quot;')}">▸ genetic breakdown</a>` : ''}</div>` : ''}
+    ${chips ? `<div class="chips">${chips}</div>` : ''}
+  </div>`;
+}
+
+async function search() {
+  $('#summary').textContent = 'Searching…';
+  // Ancestry mode when ancestors are picked, or global-rank mode is on.
+  if (ancestors.length || globalMode) { return ancestrySearch(); }
+  const p = baseParams();
+  const sortV = $('#sort').value;
+  if (sortV) p.set('sort', sortV);
+  p.set('page', page);
+  const data = await (await fetch('/api/search?' + p)).json();
+  if (data.error) { $('#summary').innerHTML = `<span class="error">${data.error}</span>`; return; }
+  $('#summary').textContent = `${data.total.toLocaleString()} matches` +
+    (data.total > data.pageSize ? ` — page ${data.page} of ${Math.ceil(data.total / data.pageSize)}` : '');
+  $('#results').innerHTML = data.results.map((r) => card(r)).join('') || '<div class="summary">No matches.</div>';
+  const pages = Math.ceil(data.total / data.pageSize);
+  $('#pager').innerHTML = pages > 1
+    ? `<button id="prev" ${page <= 1 ? 'disabled' : ''}>← Prev</button>
+       <span class="summary">page ${page}/${pages}</span>
+       <button id="next" ${page >= pages ? 'disabled' : ''}>Next →</button>` : '';
+  $('#prev')?.addEventListener('click', () => { page--; search(); });
+  $('#next')?.addEventListener('click', () => { page++; search(); });
+  window.scrollTo(0, 0);
+}
+
+async function ancestrySearch() {
+  const alg = $('#alg').value;
+  const p = baseParams();
+  if (ancestors.length) { p.set('ancestor_id', ancestors.map((a) => a.id).join(',')); }
+  p.set('alg', alg);
+  p.set('min', $('#minThresh').value);
+  const data = await (await fetch('/api/ancestor-search?' + p)).json();
+  if (data.error) { $('#summary').innerHTML = `<span class="error">${data.error}</span>`; return; }
+  $('#summary').innerHTML = data.global
+    ? `<b>${data.total.toLocaleString()}</b> strains ranked by <b>${alg}</b> (all ancestors)`
+    : `<b>${data.total.toLocaleString()}</b> strains descended from <b>${ancestors.map((a) => a.name).join(' + ')}</b>, ranked by <b>${alg}</b>`;
+  $('#results').innerHTML = data.results.map((r) => {
+    const badge = `<span class="score-badge" title="contrib ${(r.contribution*100).toFixed(1)}% · conv ${r.convergence} · ×${r.occurrences} · gen ${r.closest_gen}">${fmtScore(alg, r.score)}</span>`;
+    return card(r, badge);
+  }).join('') || '<div class="summary">No matches at this threshold.</div>';
+  $('#pager').innerHTML = data.total > 100 ? '<span class="summary">showing top 100</span>' : '';
+  window.scrollTo(0, 0);
+}
+
+// ---- per-strain breakdown modal, with algorithm toggle ----
+let modalStrain = null, modalAlg = 'contribution';
+async function showAncestry(strainId, name) {
+  modalStrain = { id: strainId, name };
+  $('#mTitle').textContent = name;
+  document.querySelectorAll('.algtabs button').forEach((b) => b.classList.toggle('on', b.dataset.alg === modalAlg));
+  $('#mSub').textContent = ALG_DESC[modalAlg];
+  $('#mBody').innerHTML = 'Loading…';
+  $('#modalBg').classList.add('open');
+  const { ancestors: ancs, error } = await (await fetch(`/api/lineage?strain_id=${strainId}&alg=${modalAlg}`)).json();
+  if (error) { $('#mBody').innerHTML = `<span class="error">${error}</span>`; return; }
+  if (!ancs.length) { $('#mBody').innerHTML = '<div class="sub">No ancestry scored under this algorithm.</div>'; return; }
+  const max = ancs[0].score || 1;
+  $('#mBody').innerHTML = ancs.map((a) => `
+    <div class="anc">
+      <div class="nm">${a.ancestor} ${a.sides > 1 ? `<span class="gen">(${a.sides} sides)</span>` : ''} ${a.occurrences > 1 ? `<span class="gen">×${a.occurrences}</span>` : ''}</div>
+      <div class="pct">${fmtScore(modalAlg, a.score)} <span class="gen">gen ${a.closest_gen}</span></div>
+      <div class="bar"><i style="width:${Math.max(2, (a.score / max) * 100)}%"></i></div>
+    </div>`).join('');
+}
+document.querySelectorAll('.algtabs button').forEach((b) =>
+  b.addEventListener('click', () => { modalAlg = b.dataset.alg; if (modalStrain) showAncestry(modalStrain.id, modalStrain.name); }));
+
+document.addEventListener('click', (e) => {
+  const link = e.target.closest('.ancestry-link');
+  if (link) { e.preventDefault(); showAncestry(link.dataset.sid, link.dataset.name); }
+});
+$('#mClose').addEventListener('click', () => $('#modalBg').classList.remove('open'));
+$('#modalBg').addEventListener('click', (e) => { if (e.target.id === 'modalBg') $('#modalBg').classList.remove('open'); });
+
+// ---- ancestor autocomplete + chips ----
+let acItems = [], acActive = -1, acTimer = null;
+function renderChips() {
+  $('#ancChips').innerHTML = ancestors.map((a, i) =>
+    `<span class="chip" data-i="${i}">${a.name}</span>`).join('');
+}
+$('#ancChips').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (chip) { ancestors.splice(+chip.dataset.i, 1); renderChips(); page = 1; search(); }
+});
+function closeMenu() { $('#acMenu').classList.remove('open'); acItems = []; acActive = -1; }
+async function acLookup(q) {
+  const { suggestions } = await (await fetch('/api/strain-suggest?q=' + encodeURIComponent(q))).json();
+  acItems = suggestions.filter((s) => !ancestors.some((a) => a.id === s.id));
+  $('#acMenu').innerHTML = acItems.map((s, i) =>
+    `<div class="ac-item ${i === acActive ? 'active' : ''}" data-i="${i}">${s.name}<span class="cnt">${s.descendants} desc</span></div>`).join('')
+    || '<div class="ac-item"><span class="cnt">no matches</span></div>';
+  $('#acMenu').classList.toggle('open', true);
+}
+function pickAncestor(i) {
+  const s = acItems[i];
+  if (!s) return;
+  ancestors.push({ id: s.id, name: s.name });
+  globalMode = false; // an explicit ancestor takes over from global mode
+  renderChips();
+  $('#ancInput').value = '';
+  closeMenu();
+  page = 1; search();
+}
+$('#ancInput').addEventListener('input', (e) => {
+  clearTimeout(acTimer);
+  const v = e.target.value.trim();
+  if (v.length < 2) { closeMenu(); return; }
+  acTimer = setTimeout(() => acLookup(v), 180);
+});
+$('#ancInput').addEventListener('keydown', (e) => {
+  if (!$('#acMenu').classList.contains('open')) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); acActive = Math.min(acActive + 1, acItems.length - 1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); acActive = Math.max(acActive - 1, 0); }
+  else if (e.key === 'Enter') { e.preventDefault(); pickAncestor(acActive < 0 ? 0 : acActive); return; }
+  else if (e.key === 'Escape') { closeMenu(); return; }
+  document.querySelectorAll('.ac-item').forEach((el, i) => el.classList.toggle('active', i === acActive));
+});
+$('#acMenu').addEventListener('click', (e) => {
+  const it = e.target.closest('.ac-item');
+  if (it && it.dataset.i != null) pickAncestor(+it.dataset.i);
+});
+document.addEventListener('click', (e) => { if (!e.target.closest('.ac-wrap')) closeMenu(); });
+
+// ---- algorithm + threshold controls ----
+$('#alg').addEventListener('change', () => { $('#algDesc').textContent = ALG_DESC[$('#alg').value]; if (ancestors.length || globalMode) { page = 1; search(); } });
+$('#minThresh').addEventListener('input', () => { $('#minLabel').textContent = $('#minThresh').value; });
+$('#minThresh').addEventListener('change', () => { if (ancestors.length || globalMode) { page = 1; search(); } });
+$('#globalRank').addEventListener('click', () => { globalMode = true; page = 1; search(); });
+$('#algDesc').textContent = ALG_DESC.convergence;
+
+$('#go').addEventListener('click', () => { page = 1; search(); });
+$('#clear').addEventListener('click', () => {
+  document.querySelectorAll('input[type=checkbox]').forEach((c) => c.checked = false);
+  for (const id of ['q', 'lineage', 'thc_min', 'thc_max', 'source', 'flowering']) $('#' + id).value = '';
+  ancestors = []; renderChips(); globalMode = false;
+  page = 1; search();
+});
+document.body.addEventListener('keydown', (e) => {
+  // ancestor input manages its own Enter (autocomplete select)
+  if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.id !== 'ancInput') { page = 1; search(); }
+});
+
+loadFacets().then(search);
+</script>
+</body>
+</html>

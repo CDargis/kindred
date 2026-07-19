@@ -1,0 +1,13 @@
+{
+  "name": "kindred",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "backfill": "node --env-file=.env sync/backfill.mjs"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "pg": "^8.22.0"
+  }
+}
