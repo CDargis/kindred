@@ -2,3 +2,5 @@ node_modules/
 .env
 *.log
 spike/spike-output.json
+cdk.out/
+infra/cdk.out/

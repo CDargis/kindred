@@ -1,0 +1,21 @@
+{
+  "name": "kindred-infra",
+  "version": "0.1.0",
+  "private": true,
+  "bin": { "kindred": "bin/kindred.js" },
+  "scripts": {
+    "synth": "cdk synth",
+    "deploy": "cdk deploy",
+    "bootstrap": "cdk bootstrap"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.160.0",
+    "constructs": "^10.3.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "aws-cdk": "^2.160.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,12 +1,17 @@
-// Local strain explorer. Run: node --no-warnings --env-file=.env ui/server.mjs → http://localhost:3000
+// Kindred strain explorer. Local: node --no-warnings --env-file=.env ui/server.mjs
+// Also exported as `app` for the Lambda handler (lambda/index.mjs).
 import express from 'express';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { createPool } from '../sync/lib/db.mjs';
+import { mountAuth } from './auth.mjs';
 
-const app = express();
+export const app = express();
 const pool = createPool();
 const dir = path.dirname(fileURLToPath(import.meta.url));
+
+// Auth guard — login routes are public; everything registered after requires a session.
+mountAuth(app);
 
 // Ancestry ranking algorithms → strain_ancestry column. Add a new algorithm by
 // adding a column to the closure and one entry here; the API + UI pick it up.
@@ -164,5 +169,8 @@ app.get('/api/lineage', async (req, res) => {
   } catch (err) { res.status(500).json({ error: String(err) }); }
 });
 
-const port = process.env.PORT ?? 3000;
-app.listen(port, () => console.log(`seeds explorer → http://localhost:${port}`));
+// Only listen when run directly (local dev); under Lambda the handler drives it.
+if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('server.mjs')) {
+  const port = process.env.PORT ?? 3000;
+  app.listen(port, () => console.log(`Kindred → http://localhost:${port}`));
+}
