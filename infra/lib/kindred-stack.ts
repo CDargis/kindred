@@ -2,10 +2,19 @@ import * as path from 'path';
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
+import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as targets from 'aws-cdk-lib/aws-route53-targets';
 
-// Cheapest viable shape: one Lambda (the Express app via serverless-express)
-// behind a Function URL (no API Gateway cost). Scales to zero. Neon is separate.
-// A custom domain (CloudFront + ACM + R53 alias) is a documented fast-follow.
+const DOMAIN = 'kindred.chrisdargis.com';
+const ZONE = 'chrisdargis.com';
+const ZONE_ID = 'Z0403035565ZEMQD3654'; // chrisdargis.com — pinned so no lookup role is needed
+
+// One Lambda (Express via serverless-express) behind a Function URL (no API
+// Gateway cost), fronted by CloudFront for the custom domain at kindred.
+// .chrisdargis.com. Scales to zero; Neon is separate.
 export class KindredStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -36,7 +45,37 @@ export class KindredStack extends cdk.Stack {
     // App does its own auth, so the URL itself is open.
     const url = fn.addFunctionUrl({ authType: lambda.FunctionUrlAuthType.NONE });
 
+    // Custom domain: CloudFront in front of the Function URL + ACM cert + R53 alias.
+    const zone = route53.HostedZone.fromHostedZoneAttributes(this, 'Zone', {
+      hostedZoneId: ZONE_ID,
+      zoneName: ZONE,
+    });
+    const cert = new acm.Certificate(this, 'Cert', {
+      domainName: DOMAIN,
+      validation: acm.CertificateValidation.fromDns(zone), // auto-creates validation record
+    });
+    const dist = new cloudfront.Distribution(this, 'Dist', {
+      domainNames: [DOMAIN],
+      certificate: cert,
+      defaultBehavior: {
+        origin: new origins.FunctionUrlOrigin(url),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,          // POST /login
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,          // dynamic app
+        // Forward cookies/query/headers to origin, but NOT Host — a Function URL
+        // rejects a mismatched Host header.
+        originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+      },
+    });
+    new route53.ARecord(this, 'Alias', {
+      zone,
+      recordName: 'kindred',
+      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(dist)),
+    });
+
+    new cdk.CfnOutput(this, 'AppUrl', { value: `https://${DOMAIN}` });
     new cdk.CfnOutput(this, 'FunctionUrl', { value: url.url });
+    new cdk.CfnOutput(this, 'CloudFrontDomain', { value: dist.distributionDomainName });
   }
 }
 
